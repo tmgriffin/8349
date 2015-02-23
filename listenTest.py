@@ -35,9 +35,9 @@ class Listener:
 		while True:
 		    connection, address = self.serversocket.accept()
 		    
-		    thread.start_new_thread(Read_PT_Message, (connection, ))
+		    thread.start_new_thread(self.Read_PT_Message, (connection, ))
 
-		    thread.start_new_thread(Read_Covert_Message, () )
+		    thread.start_new_thread(self.Read_Covert_Message, () )
 
 	def Read_PT_Message( self, connection ):
 		buf = connection.recv(1024)
@@ -55,8 +55,10 @@ class Listener:
 
 	def Read_Covert_Message(self ):
 		
-		eof = False
+		global soundDone
+		soundDone = False
 
+		p = pyaudio.PyAudio()
 		stream = p.open(format=self.FORMAT,
 			                channels=self.CHANNELS,
 			                rate=self.RATE,
@@ -66,10 +68,10 @@ class Listener:
 			# set up pitch detect
 		detect = new_aubio_pitchdetection(self.CHUNK,self.CHUNK/2,self.CHANNELS,
 			                self.RATE,self.PITCHALG,self.PITCHOUT)
-		p = pyaudio.PyAudio()
+		
 		frames = []
 		frameCount = 0
-		while( not eof):
+		while( not soundDone):
 			
 			buf = new_fvec(self.CHUNK,self.CHANNELS)
 
@@ -79,9 +81,12 @@ class Listener:
 			data = None
 
 			#Record audio for given time
-			for i in range(0, int(self.RATE / self.CHUNK * self.RECORD_SECONDS)):
-			    data = stream.read(self.CHUNK)
-			    
+			for i in range(0, int(self.RATE / self.CHUNK)):
+			    try:
+			    	data = stream.read(self.CHUNK)
+			    except IOError:
+			    	print "Dropped Frame"
+
 			    if i%5 == 0:
 			    	floats = struct.unpack('f'*(len(data)/4),data)
 			    	frames.append(floats)
@@ -90,16 +95,16 @@ class Listener:
 			#self.Process_Covert_Message(frames, buf, detect)
 			print("* done recording")
 
-			self.Process_Covert_Message(frames, buf, detect, frameCount)
-			#thread.start_new_thread(self.Process_Covert_Message,(frames, buf, detect, ))
+			#self.Process_Covert_Message(frames, buf, detect, frameCount)
+			thread.start_new_thread(self.Process_Covert_Message,(frames, buf, detect, frameCount ))
 
-			#print frames
-			stream.stop_stream()
-			stream.close()
-			p.terminate()
+		#print frames
+		stream.stop_stream()
+		stream.close()
+		p.terminate()
 
-			print "closed"
-
+		print "closed"
+		print self.valuesHeard
 		#exit()
 
 
@@ -132,6 +137,7 @@ class Listener:
 		elif freq > 1400 and freq < 1600:
 			print "Read Control sound"
 			self.valuesHeard.append(2)
+			soundDone = True
 		else:
 			print "Unknown pitch"
 
@@ -144,7 +150,7 @@ class Listener:
 		print "Hello world"
 
 		# Defines constants for the audio components. Don't change probably
-		self.CHUNK = 512
+		self.CHUNK = 1024
 		self.FORMAT = pyaudio.paFloat32
 		self.CHANNELS = 2
 		self.RATE = 44100
