@@ -9,11 +9,11 @@ from multiprocessing.pool import ThreadPool
 
 
 # Defines constants for the audio components. Don't change probably
-CHUNK = 1024 
+CHUNK = 512 
 FORMAT = pyaudio.paFloat32
 CHANNELS = 2
 RATE = 44100
-RECORD_SECONDS = 3
+RECORD_SECONDS = 5
 PITCHALG    = aubio_pitch_yin
 PITCHOUT    = aubio_pitchm_freq
 
@@ -100,9 +100,9 @@ def Process_Covert_Message(frames):
 			freq = aubio_pitchdetection(detect,buf)
 	 
 		  # find energy of audio frame
-			energy = vec_local_energy(buf)
+			#energy = vec_local_energy(buf)
 	 
-		print "\n\n\n\nHEY LISTEN \n{:10.4f} {:10.4f}".format(freq,energy)
+		print "\n\n\n\nHEY LISTEN \n{:10.4f}".format(freq)
 		#del_fvec(buf)
 		#buf = new_fvec(CHUNK,CHANNELS)
 
