@@ -9,7 +9,7 @@ from multiprocessing.pool import ThreadPool
 
 
 # Defines constants for the audio components. Don't change probably
-CHUNK = 1024 
+CHUNK = 512
 FORMAT = pyaudio.paFloat32
 CHANNELS = 2
 RATE = 44100
@@ -19,7 +19,8 @@ PITCHOUT    = aubio_pitchm_freq
 
 # Server consts
 PORT = 8349
-
+global values
+values = []
 
 #Open listening stream
 p = pyaudio.PyAudio()
@@ -32,7 +33,7 @@ stream = p.open(format=FORMAT,
 #Setup socet server
 serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serversocket.bind(('localhost', PORT))
-serversocket.listen(5) # become a server socket, maximum 5 connections
+serversocket.listen(1) # become a server socket, maximum 5 connections
 
 Listen_for_PT_Message()
 
@@ -65,11 +66,13 @@ def Read_Covert_Message():
 	buf = new_fvec(CHUNK,CHANNELS)
 
 	eof = False
+	frames = []
+	frameCounter = 0
 
 	while(!eof):
 		print("* recording")
 
-		frames = []
+		
 
 		#Record audio for given time
 		for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
@@ -81,8 +84,8 @@ def Read_Covert_Message():
 
 		print("* done recording")
 
-		thread.start_new_thread( Process_Covert_Message,( frames, ) )
-
+		thread.start_new_thread( Process_Covert_Message,( frames, frameCounter) )
+		frameCounter += 1
 	#print frames
 	stream.stop_stream()
 	stream.close()
@@ -91,22 +94,25 @@ def Read_Covert_Message():
 	#exit()
 
 
-def Process_Covert_Message(frames):
-	for j in range(len(frames)):
-		
+def Process_Covert_Message(frames,counter):
 		#Write the sample's values into the required data structure
-		for i in range(len(frames[j])):
-			fvec_write_sample(buf, frames[j][i], 0, i)
-	 
-		  # find pitch of audio frame
-			freq = aubio_pitchdetection(detect,buf)
-	 
-		  # find energy of audio frame
-			#energy = vec_local_energy(buf)
-	 
-		print "\n\n\n\nHEY LISTEN \n{:10.4f}".format(freq)
-		#del_fvec(buf)
-		#buf = new_fvec(CHUNK,CHANNELS)
+	freq = 0
+	for i in range(len(frames[j])):
+		fvec_write_sample(buf, frames[counter][i], 0, i)
+ 
+	  # find pitch of audio frame
+		freq = aubio_pitchdetection(detect,buf)
+ 
+	  # find energy of audio frame
+		#energy = vec_local_energy(buf)
+ 
+ 	
+	print "\n\n\n\nHEY LISTEN \n{:10.4f}".format(freq)
+	if freq <200:
+		print "Read null"
+	
+	#del_fvec(buf)
+	#buf = new_fvec(CHUNK,CHANNELS)
 
 
 def Decode_Covert_Message():
