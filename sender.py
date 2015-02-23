@@ -8,6 +8,7 @@ import audiogen
 def handler(signal, frame):
 	print('End of file!')
 	sock = frame.f_locals['clientSocket']
+	sock.send('\0')
 	sock.close()
 	exit()
 
@@ -15,21 +16,36 @@ def handler(signal, frame):
 def soundSend():
 
 	#Generators for each of the pitches. Need to adjust numbers
-	zeroGen = audiogen.util.crop(audiogen.tone(1000), .2)
-	oneGen = audiogen.util.crop(audiogen.tone(2000), .2)
-	controlGen = audiogen.util.crop(audiogen.tone(3000), .2)
+	#zeroGen = (audiogen.util.crop(audiogen.tone(1000), .2))
+	#oneGen = (audiogen.util.crop(audiogen.tone(2000), .2))
+	#controlGen = (audiogen.util.crop(audiogen.tone(3000), .2))
 	#audiogen.sampler.play(zeroGen)
 
-	with open(argv[2], 'rb') as f:
+	with open(sys.argv[2], 'rb') as f:
 		byte = f.read(1)
 		mask = 1
 		char = 'a'
+		print "Hello: ",byte
 		while len(byte) > 0:
 			bit = 0
-			for i in reversed(range(8)):
-				bit = byte & (mask<<i)
-				bit = bit<<1
-			print char(bit)
+			byte = ord(byte)
+			for i in reversed(range(1,8)):
+				
+				#Two commented lines are used to reconstruct bytes
+				#bit += (mask & (byte>>i))
+				#bit = bit<<1
+				bit = (mask & (byte>>i))
+				if bit == 0:
+					audiogen.sampler.play(audiogen.util.crop(audiogen.tone(1000), .2),True)
+				else:
+					audiogen.sampler.play(audiogen.util.crop(audiogen.tone(2000), .2),True)
+				
+				#print "Step",i,": ",bit
+			#bit += (mask & (byte))
+			
+			#print "After:",chr(bit)
+			byte = f.read(1)
+			
 				
 def main():
 	PORT = 8349
@@ -56,4 +72,5 @@ def main():
 	
 	
 if __name__ == "__main__":
-	main()
+	#main()
+	soundSend()
