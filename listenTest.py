@@ -54,24 +54,28 @@ class Listener:
 			f.write( str(msg) )
 
 	def Read_Covert_Message(self ):
+		
 		eof = False
 
-		while( not eof):
-			p = pyaudio.PyAudio()
-			stream = p.open(format=self.FORMAT,
+		stream = p.open(format=self.FORMAT,
 			                channels=self.CHANNELS,
 			                rate=self.RATE,
 			                input=True,
 			                frames_per_buffer=self.CHUNK)
 
 			# set up pitch detect
-			detect = new_aubio_pitchdetection(self.CHUNK,self.CHUNK/2,self.CHANNELS,
-			                                  self.RATE,self.PITCHALG,self.PITCHOUT)
+		detect = new_aubio_pitchdetection(self.CHUNK,self.CHUNK/2,self.CHANNELS,
+			                self.RATE,self.PITCHALG,self.PITCHOUT)
+		p = pyaudio.PyAudio()
+		frames = []
+		frameCount = 0
+		while( not eof):
+			
 			buf = new_fvec(self.CHUNK,self.CHANNELS)
 
 			print("* recording")
 
-			frames = []
+			
 			data = None
 
 			#Record audio for given time
@@ -86,7 +90,7 @@ class Listener:
 			#self.Process_Covert_Message(frames, buf, detect)
 			print("* done recording")
 
-			self.Process_Covert_Message(frames, buf, detect)
+			self.Process_Covert_Message(frames, buf, detect, frameCount)
 			#thread.start_new_thread(self.Process_Covert_Message,(frames, buf, detect, ))
 
 			#print frames
@@ -99,24 +103,37 @@ class Listener:
 		#exit()
 
 
-	def Process_Covert_Message(self, frames, buf, detect):
+	def Process_Covert_Message(self, frames, buf, detect, count):
 		print "processing"
-		for j in range(len(frames)):
-			
 			#Write the sample's values into the required data structure
-			for i in range(len(frames[j])):
-				fvec_write_sample(buf, frames[j][i], 0, i)
-		 
-			  # find pitch of audio frame
-				freq = aubio_pitchdetection(detect,buf)
-		 
-			  # find energy of audio frame
-				#energy = vec_local_energy(buf)
-		 
-			print "\n\n\n\nHEY LISTEN \n{:10.4f}".format(freq)
-			#del_fvec(buf)
-			#buf = new_fvec(CHUNK,CHANNELS)
-
+		for i in range(len(frames[count])):
+			fvec_write_sample(buf, frames[count][i], 0, i)
+	 
+		  # find pitch of audio frame
+			freq = aubio_pitchdetection(detect,buf)
+	 
+		  # find energy of audio frame
+			#energy = vec_local_energy(buf)
+	 
+		print "\n\n\n\nHEY LISTEN \n{:10.4f}".format(freq)
+		#del_fvec(buf)
+		#buf = new_fvec(CHUNK,CHANNELS)
+		
+		#decide what pitch it was
+		if freq < 200:
+			print "No pitch"
+			self.valuesHeard.append(-1)
+		elif freq > 400 and freq < 600:
+			print "Read a 0"
+			self.valuesHeard.append(0)
+		elif freq > 900 and freq < 1100:
+			print "Read a 1"
+			self.valuesHeard.append(1)
+		elif freq > 1400 and freq < 1600:
+			print "Read Control sound"
+			self.valuesHeard.append(2)
+		else:
+			print "Unknown pitch"
 
 	def Decode_Covert_Message(self ):
 		#stuff
@@ -127,7 +144,7 @@ class Listener:
 		print "Hello world"
 
 		# Defines constants for the audio components. Don't change probably
-		self.CHUNK = 1024 
+		self.CHUNK = 512
 		self.FORMAT = pyaudio.paFloat32
 		self.CHANNELS = 2
 		self.RATE = 44100
@@ -137,7 +154,7 @@ class Listener:
 
 		# Server consts
 		self.PORT = 8349
-
+		self.valuesHeard = []
 		self.main()
 
 if __name__ == "__main__":
