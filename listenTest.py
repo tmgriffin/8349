@@ -9,11 +9,11 @@ from multiprocessing.pool import ThreadPool
 
 
 # Defines constants for the audio components. Don't change probably
-CHUNK = 512 
+CHUNK = 1024 
 FORMAT = pyaudio.paFloat32
 CHANNELS = 2
 RATE = 44100
-RECORD_SECONDS = 5
+RECORD_SECONDS = 3
 PITCHALG    = aubio_pitch_yin
 PITCHOUT    = aubio_pitchm_freq
 
@@ -74,9 +74,11 @@ def Read_Covert_Message():
 		#Record audio for given time
 		for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
 		    data = stream.read(CHUNK)
-		    floats = struct.unpack('f'*(len(data)/4),data)
-		    #print floats
-		    frames.append(floats)
+		    
+		    if i%5 == 0:
+				floats = struct.unpack('f'*(len(data)/4),data)
+				frames.append(floats)
+
 		print("* done recording")
 
 		thread.start_new_thread( Process_Covert_Message,( frames, ) )
