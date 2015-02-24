@@ -66,37 +66,35 @@ class Listener:
 			                frames_per_buffer=self.CHUNK)
 
 			# set up pitch detect
-		detect = new_aubio_pitchdetection(self.CHUNK,self.CHUNK/2,self.CHANNELS,
-			                self.RATE,self.PITCHALG,self.PITCHOUT)
+		
 		
 		frames = []
 		frameCount = 0
 		while( not soundDone):
 			
-			buf = new_fvec(self.CHUNK,self.CHANNELS)
-
 			print("* recording")
 
-			
 			data = None
 
 			#Record audio for given time
-			for i in range(0, int(self.RATE / self.CHUNK)):
-			    try:
-			    	data = stream.read(self.CHUNK)
-			    except IOError:
-			    	print "Dropped Frame"
+			try:
+				for i in range(0, int(self.RATE / self.CHUNK)):
+					data = stream.read(self.CHUNK)
 
-			    if i%5 == 0:
-			    	floats = struct.unpack('f'*(len(data)/4),data)
-			    	frames.append(floats)
+					if i%5 == 0 and data!=None:
+						floats = struct.unpack('f'*(len(data)/4),data)
+						frames.append(floats)
 
+				#self.Process_Covert_Message(frames, buf, detect)
+				print("* done recording")
 
-			#self.Process_Covert_Message(frames, buf, detect)
-			print("* done recording")
-
-			#self.Process_Covert_Message(frames, buf, detect, frameCount)
-			thread.start_new_thread(self.Process_Covert_Message,(frames, buf, detect, frameCount ))
+				#self.Process_Covert_Message(frames, buf, detect, frameCount)
+				thread.start_new_thread(self.Process_Covert_Message,(frames, frameCount ))
+				frameCount += 1
+			except IOError:
+				print "Dropped Frame"
+			#else:
+				#print "Some other sort of error?"
 
 		#print frames
 		stream.stop_stream()
@@ -108,9 +106,14 @@ class Listener:
 		#exit()
 
 
-	def Process_Covert_Message(self, frames, buf, detect, count):
+	def Process_Covert_Message(self, frames, count):
 		print "processing"
 			#Write the sample's values into the required data structure
+		detect = new_aubio_pitchdetection(self.CHUNK,self.CHUNK/2,self.CHANNELS,
+			                self.RATE,self.PITCHALG,self.PITCHOUT)
+			                
+		buf = new_fvec(self.CHUNK,self.CHANNELS)
+		
 		for i in range(len(frames[count])):
 			fvec_write_sample(buf, frames[count][i], 0, i)
 	 
@@ -140,6 +143,9 @@ class Listener:
 			soundDone = True
 		else:
 			print "Unknown pitch"
+			
+		#del_fvec(buf)
+		del_aubio_pitchdetection(detect)
 
 	def Decode_Covert_Message(self ):
 		#stuff
@@ -153,7 +159,7 @@ class Listener:
 		self.CHUNK = 1024
 		self.FORMAT = pyaudio.paFloat32
 		self.CHANNELS = 2
-		self.RATE = 44100
+		self.RATE = 48000
 		self.RECORD_SECONDS = 3
 		self.PITCHALG    = aubio_pitch_yin
 		self.PITCHOUT    = aubio_pitchm_freq
