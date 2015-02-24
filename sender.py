@@ -6,6 +6,7 @@ import thread
 import audiogen
 import os
 import contextlib
+import time
 
 #handles the SIGINT
 def handler(signal, frame):
@@ -15,12 +16,6 @@ def handler(signal, frame):
 		sock.send('\0')
 		sock.close()
 		exit()
-	"""
-	else:
-		audiogen.sampler.play(audiogen.util.crop(audiogen.tone(3000), .2),True)
-		thread.exit()
-		os.kill(os.getpid(),signal.SIGINT)
-	"""
 
 #context manager to avoid unnecessary prints
 @contextlib.contextmanager
@@ -45,11 +40,14 @@ def soundSend():
 		byte = f.read(1)
 		mask = 1
 		char = 'a'
-		#print "Hello: ",byte
+		
+		#wait for the other side to start
+		time.sleep(1)
+		
 		while len(byte) > 0:
 			bit = 0
 			byte = ord(byte)
-			for i in reversed(range(1,8)):
+			for i in reversed(range(8)):
 				
 				#Two commented lines are used to reconstruct bytes
 				#bit += (mask & (byte>>i))
@@ -65,6 +63,8 @@ def soundSend():
 			
 			#print "After:",chr(bit)
 			byte = f.read(1)
+		#Finishing tone
+		audiogen.sampler.play(audiogen.util.crop(audiogen.tone(3000), .4),True)
 			
 				
 def main():
@@ -94,6 +94,7 @@ def main():
 		clientSocket.send(line)
 		clientSocket.send("\n")
 	
+	soundThread.join()
 	
 if __name__ == "__main__":
 	main()
