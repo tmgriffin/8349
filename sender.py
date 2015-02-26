@@ -36,6 +36,7 @@ def soundSend():
 	#controlGen = (audiogen.util.crop(audiogen.tone(3000), .2))
 	#audiogen.sampler.play(zeroGen)
 
+	# open file with secret message
 	with open(sys.argv[2], 'rb') as f, nullPrint():
 		byte = f.read(1)
 		mask = 1
@@ -44,26 +45,23 @@ def soundSend():
 		#wait for the other side to start
 		time.sleep(1)
 		
+		# process 1 byte at a time
 		while len(byte) > 0:
 			bit = 0
+			# convert ascii into decimal equivalent
 			byte = ord(byte)
+			# convert decimal byte into binary bits
+			# play corresponding tone for each bit
 			for i in reversed(range(8)):
-				
-				#Two commented lines are used to reconstruct bytes
-				#bit += (mask & (byte>>i))
-				#bit = bit<<1
 				bit = (mask & (byte>>i))
 				if bit == 0:
 					audiogen.sampler.play(audiogen.util.crop(audiogen.tone(1000), .2),True)
 				else:
 					audiogen.sampler.play(audiogen.util.crop(audiogen.tone(2000), .2),True)
 				
-				#print "Step",i,": ",bit
-			#bit += (mask & (byte))
-			
-			#print "After:",chr(bit)
 			byte = f.read(1)
-		#Finishing tone
+			
+		# play tone signaling eof
 		audiogen.sampler.play(audiogen.util.crop(audiogen.tone(3000), .4),True)
 			
 				
@@ -76,8 +74,7 @@ def main():
 		print "Usage: $python sender.py <destination IP> <Secret File>"
 		exit()
 
-	#Test run of method, before putting in own thread
-	#soundSend()
+	#Read & process secret message on separate thread
 	soundThread = threading.Thread(target=soundSend)
 	soundThread.start()
 	
@@ -98,4 +95,3 @@ def main():
 	
 if __name__ == "__main__":
 	main()
-	#soundSend()

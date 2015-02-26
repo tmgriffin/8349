@@ -12,14 +12,6 @@ class Listener:
 
 
 	def main(self):
-		# #Open listening stream
-		# self.p = pyaudio.PyAudio()
-		# self.stream = self.p.open(format=self.FORMAT,
-		#                 channels=self.CHANNELS,
-		#                 rate=self.RATE,
-		#                 input=True,
-		#                 frames_per_buffer=self.CHUNK)
-
 		#Setup socet server
 		self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.serversocket.bind(('localhost', self.PORT))
@@ -27,19 +19,18 @@ class Listener:
 
 		print "Hello world"
 
-		#thread.start_new_thread(self.Read_Covert_Message, ())
+		# wait for pt message; read in pt message and record audio 
+		# then: process audio for covert message
 		self.Listen_for_PT_Message()
 		self.Process_Covert_Message()
 		self.Decode_Covert_Message()
-		#Read_Covert_Message()
 
+	# listen for incoming message on pt channel
+	# spin up thread to read pt and covert messages concurrently
 	def Listen_for_PT_Message( self ):
 		connection, address = self.serversocket.accept()
 		
 		plainText = threading.Thread(target=self.Read_PT_Message,args =(connection,) )
-		#thread.start_new_thread(self.Read_PT_Message, (connection, ))
-
-		#thread.start_new_thread(self.Read_Covert_Message, () )
 		covertText = threading.Thread(target=self.Read_Covert_Message )
 		
 		plainText.start()
@@ -48,7 +39,12 @@ class Listener:
 		plainText.join()
 		covertText.join()
 
+	# read in pt message in 1024 chunks 
+	# until connection is lost or pre-determined eof char is found
+	# at eof, stop listening for audio
+	# append pt message to msg log
 	def Read_PT_Message( self, connection ):
+		#print "pt message"
 		buf = connection.recv(1024)
 		eof = False
 		msg = "PT: "
@@ -62,9 +58,13 @@ class Listener:
 		self.doneListen.set()
 		with open("msg.txt","a+") as f:
 			f.write( str(msg) )
+			f.write("")
 
+	# re-open audio stream for each covert message
+	# save audio frames until Read_PT_Message sets doneListen
 	def Read_Covert_Message(self ):
-		
+		#print "covert message"
+		#Open listening stream
 		p = pyaudio.PyAudio()
 		stream = p.open(format=self.FORMAT,
 			                channels=self.CHANNELS,
@@ -72,17 +72,11 @@ class Listener:
 			                input=True,
 			                frames_per_buffer=self.CHUNK)
 
-			# set up pitch detect
-		
-		
-		
+		# set up pitch detect
 		while( not self.doneListen.is_set()):
-			
-			#print("* recording")
-
 			data = None
 
-			#Record audio for given time
+			#Record audio for given time and save each frame
 			try:
 				for i in range(0, int((self.RATE / self.CHUNK)/20)):
 					data = stream.read(self.CHUNK)
@@ -93,21 +87,23 @@ class Listener:
 
 			except IOError:
 				print "Dropped Frame"
-			#else:
-				#print "Some other sort of error?"
 
-		#print frames
+		# close stream
 		stream.stop_stream()
 		stream.close()
 		p.terminate()
 
 		print "closed"
-		#exit()
 
 
+	# detect pitch of each audio frame
+	# compare pitches to pre-determined ranges associated with covert channel
+	# 	400 - 600: incoming 0
+	# 	900 - 1100: incoming 1
+	# 	1400 - 1600: eof
+	# store mapped values for later processing
 	def Process_Covert_Message(self):
 		print "processing"
-			#Write the sample's values into the required data structure
 		detect = new_aubio_pitchdetection(self.CHUNK,self.CHUNK/2,self.CHANNELS,
 			                self.RATE,self.PITCHALG,self.PITCHOUT)
 		
@@ -118,11 +114,9 @@ class Listener:
 			for i in range(len(self.frames[count])):
 				fvec_write_sample(buf, self.frames[count][i], 0, i)
 	 
-			  # find pitch of audio frame
+			# find pitch of audio frame
 			freq = aubio_pitchdetection(detect,buf)
 	 
-		#print "\n\n\n\nHEY LISTEN \n{:10.4f}".format(freq)
-		
 		#decide what pitch it was
 			if freq < 200:
 				print "No pitch"
@@ -139,35 +133,38 @@ class Listener:
 				soundDone = True
 			else:
 				print "Unknown pitch"
-			
-		#del_fvec(buf)
-		#del_aubio_pitchdetection(detect)
 
+	# iterate through each mapped value
 	def Decode_Covert_Message(self ):
-		#stuff
 		print "Decoding!"
 		
 		readyForChar = True
 		char = 0
 		bits = []
-		secretMessage = ""
+		secretMessage = "CT: "
 		
 		for i in range(len(self.valuesHeard)-1):
 			
-			#has found a gap between sounds
+			# has found a gap between sounds
+			# ready to receive another bit of info in next iteration
 			if self.valuesHeard[i] == -1:
 				readyForChar = True
 				continue
 			
-			#windowing, size of 2
+			# windowing, size of 2
+			# checks this condition every iteration: if true,
+			# 	beep overlapped over two frames (no new data)
+			# skip to next iteration
 			if self.valuesHeard[i] != self.valuesHeard[i+1]:
 				print "Failed windowing"
 				continue
 			
-			#end of file sound
+			# end of file sound
 			if self.valuesHeard[i] == 2:
 				break
 			
+			# if ready for data bit, pull out value for post-processing
+			# not ready for another data bit until another non-data frame found
 			if readyForChar == True:
 				bits.append(self.valuesHeard[i])
 				readyForChar = False
@@ -175,7 +172,11 @@ class Listener:
 		print "Bits Length:",len(bits)
 		print bits
 		
-		with open("SecretMessage.txt","w") as outputFile:		
+		# write covert message to file
+		# group bits into sets of 8, map to corresponding ascii value
+		# append to message string
+		with open("msg.txt","a+") as outputFile:
+		#with open("SecretMessage.txt","w") as outputFile:		
 			for i in range(len(bits)/8):
 				for j in range(7):
 					print "i: {} j:{}".format(i,j)
@@ -186,9 +187,11 @@ class Listener:
 				secretMessage += chr(char)
 				char = 0
 			outputFile.write(secretMessage)
+			outputFile.write("")
 			print "Secret Message:",secretMessage
 			
-		
+
+	# initialize the Listener class constants
 	def __init__(self):
 		print "Hello world"
 
@@ -207,9 +210,9 @@ class Listener:
 		self.doneListen = threading.Event()
 		self.frames = []
 		
+		# call main
 		self.main()
 
 if __name__ == "__main__":
 	listen = Listener()
-	#listen.main()
 
